@@ -22,8 +22,14 @@ export const DEFAULT_SETTINGS = {
   spfTime: '12:00',
   notify: { enabled: false, morning: true, evening: true, spf: true },
   aiKey: '',
-  aiModel: 'openrouter/free',
 };
+
+export const FREE_FALLBACK = 'openrouter/free';
+// Только бесплатные модели. OpenRouter берёт первую свободную из списка.
+export const modelChain = (hasImage) => [
+  ...(hasImage ? ['thinkingmachines/inkling:free', 'nvidia/nemotron-3.5-super-vl:free'] : ['nvidia/nemotron-3-ultra-550b-a55b:free', 'thinkingmachines/inkling:free']),
+  FREE_FALLBACK,
+];
 
 export const SKIN_TYPES = ['Нормальная', 'Сухая', 'Жирная', 'Комбинированная', 'Не знаю'];
 export const SENSITIVITY = ['Низкая', 'Средняя', 'Высокая'];

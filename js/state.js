@@ -23,7 +23,8 @@ export const saveProfile = (p) => kvSet('profile', p);
 
 export async function getSettings() {
   // apiKey и model остались от версии с Grok: старый ключ нельзя отправлять другому сервису.
-  const { apiKey, model, ...s } = await kvGet('settings', {});
+  // aiModel и aiChoice — от прежнего выбора модели, которого больше нет.
+  const { apiKey, model, aiModel, aiChoice, ...s } = await kvGet('settings', {});
   return { ...DEFAULT_SETTINGS, ...s, notify: { ...DEFAULT_SETTINGS.notify, ...s.notify } };
 }
 export const saveSettings = (s) => kvSet('settings', s);

@@ -1,7 +1,10 @@
 // Прямое обращение к OpenRouter из браузера. Ключ вводится в профиле и хранится только на этом устройстве.
+import { modelChain } from './data.js';
 import { getSettings } from './state.js';
 
 const BASE_URL = 'https://openrouter.ai/api/v1';
+const KEYLESS_URL = 'https://text.pollinations.ai/openai';
+const KEYLESS_MODEL = 'openai-fast';
 const MAX_CONTEXT = 6000;
 
 const SYSTEM_PROMPT = `Ты — Skinly, внимательный AI-помощник по уходу за кожей в приложении Skinly AI. Отвечай на русском языке, спокойно и по делу, простыми словами.
@@ -47,8 +50,7 @@ const FOOD_PROMPT = `Оцени калорийность еды из текст�
 {"name": "короткое название", "kcal": 0, "protein": 0, "fat": 0, "carbs": 0}`;
 
 export async function getStatus() {
-  const { aiKey } = await getSettings();
-  return { ai: Boolean(aiKey), offline: !navigator.onLine };
+  return { offline: !navigator.onLine };
 }
 
 const contextBlock = (context) => `\n\n<user_data>\n${JSON.stringify(context).slice(0, MAX_CONTEXT)}\n</user_data>`;
@@ -61,27 +63,33 @@ function userContent(text, image) {
   ];
 }
 
+const post = (url, headers, body, signal) => fetch(url, {
+  method: 'POST',
+  headers: { 'content-type': 'application/json', ...headers },
+  body: JSON.stringify(body),
+  signal,
+});
+
+// С ключом отвечает OpenRouter. Без ключа или при сбое отвечает Pollinations: он работает без настройки.
 async function request(messages, stream, signal) {
-  const { aiKey, aiModel } = await getSettings();
-  if (!aiKey) throw new Error('Добавьте ключ OpenRouter в профиле.');
-  let res;
+  const { aiKey } = await getSettings();
+  const hasImage = messages.some((m) => Array.isArray(m.content));
   try {
-    res = await fetch(`${BASE_URL}/chat/completions`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', authorization: `Bearer ${aiKey}`, 'x-title': 'Skinly AI' },
-      body: JSON.stringify({ model: aiModel, messages, stream }),
-      signal,
-    });
+    if (aiKey) {
+      const res = await post(`${BASE_URL}/chat/completions`, { authorization: `Bearer ${aiKey}`, 'x-title': 'Skinly AI' }, { models: modelChain(hasImage), messages, stream }, signal).catch((err) => {
+        if (err.name === 'AbortError') throw err;
+        return null;
+      });
+      if (res?.ok) return res;
+    }
+    const res = await post(KEYLESS_URL, {}, { model: KEYLESS_MODEL, messages, stream }, signal);
+    if (res.ok) return res;
+    if (res.status === 429 || res.status === 403) throw new Error('AI сейчас перегружен. Подождите минуту или добавьте бесплатный ключ OpenRouter в профиле.');
   } catch (err) {
-    if (err.name === 'AbortError') throw err;
+    if (err.name === 'AbortError' || err.message.startsWith('AI сейчас')) throw err;
     throw new Error('Не удалось связаться с AI. Проверьте интернет.');
   }
-  if (res.ok) return res;
-  if (res.status === 401 || res.status === 403) throw new Error('OpenRouter не принял ключ. Проверьте его в профиле.');
-  if (res.status === 402) throw new Error('OpenRouter сообщает об отрицательном балансе. Проверьте аккаунт на openrouter.ai.');
-  if (res.status === 404) throw new Error('Подходящая модель сейчас недоступна. Попробуйте позже или проверьте название в профиле.');
-  if (res.status === 429) throw new Error('Бесплатный лимит исчерпан: подождите минуту, а если не поможет, попробуйте завтра.');
-  throw new Error('AI вернул ошибку. Попробуйте ещё раз.');
+  throw new Error(hasImage ? 'Фото сейчас не обработалось. Напишите текстом.' : 'AI вернул ошибку. Попробуйте ещё раз.');
 }
 
 // Некоторые бесплатные модели пишут рассуждения прямо в ответ.

@@ -241,7 +241,7 @@ async function generate(kind, prompt) {
 
 async function renderPlan(goal) {
   const [status, plans] = await Promise.all([getStatus(), getPlans()]);
-  const blocked = !status.ai || status.offline;
+  const blocked = status.offline;
   const ingredients = h('input', { type: 'text', maxLength: 200, placeholder: 'Что есть дома: курица, рис, огурцы' });
   let live = null;
   if (generation.kind) {
@@ -253,7 +253,6 @@ async function renderPlan(goal) {
   }
   return h('div.stack',
     !goal && h('div.notice', h('b', 'Сначала настройте цель'), h('p', 'С целью план будет точнее и учтёт вашу норму калорий.')),
-    !status.ai && h('div.notice', h('b', 'AI пока не подключён'), h('a.link-inline', { href: '#/profile' }, 'Добавить ключ OpenRouter в профиле')),
     h('section.plan-grid', PLANS.map(([kind, title, prompt]) => h('button.plan-btn', { type: 'button', disabled: blocked || Boolean(generation.kind), onclick: () => generate(kind, prompt) }, icon(kind === 'workout' ? 'flame' : 'spark', 20), title))),
     h('section.card.stack',
       h('h3', 'Рецепт из того, что есть'),
