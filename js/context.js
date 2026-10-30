@@ -1,6 +1,6 @@
 import { LEVELS, OILINESS, OVERALL } from './data.js';
 import { dayTotals, targets, weekSummary } from './fitness.js';
-import { getDiary, getFitDays, getFitGoal, getProducts, getProfile, getRoutines } from './state.js';
+import { getDiary, getFitDays, getFitGoal, getHabits, getProducts, getProfile, getRoutines } from './state.js';
 
 function fitContext(goal, days) {
   const weights = days.filter((d) => d.weight);
@@ -17,9 +17,10 @@ function fitContext(goal, days) {
 
 // Сводка для AI. Фотографии дневника и косметики сюда намеренно не входят.
 export async function buildContext() {
-  const [profile, products, diary, routines, goal, days] = await Promise.all([getProfile(), getProducts(), getDiary(), getRoutines(), getFitGoal(), getFitDays()]);
+  const [profile, products, diary, routines, goal, days, habits] = await Promise.all([getProfile(), getProducts(), getDiary(), getRoutines(), getFitGoal(), getFitDays(), getHabits()]);
   return {
-    fitness: fitContext(goal, days),
+    now: new Date().toLocaleString('ru-RU'),
+    fitness: { ...fitContext(goal, days), habits },
     profile: {
       name: profile.name,
       skinType: profile.skinType,

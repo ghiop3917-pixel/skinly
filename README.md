@@ -49,6 +49,7 @@ index.html, manifest.webmanifest, sw.js, icons/   каркас и PWA
 css/app.css        дизайн
 js/app.js          запуск и навигация
 js/api.js          обращение к AI и промпты
+js/actions.js      действия AI в разделах приложения
 js/db.js, state.js хранилище и данные
 js/data.js         значения по умолчанию и справочники
 js/fitness.js      расчёты раздела «Форма»

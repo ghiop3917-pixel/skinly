@@ -1,11 +1,15 @@
+import { extractActions, runActions, visibleText } from '../actions.js';
 import { getStatus, streamChat } from '../api.js';
 import { buildContext } from '../context.js';
 import { kvGet, kvSet } from '../db.js';
+import { uid } from '../state.js';
 import { confirmSheet, h, icon, pickPhoto, renderMarkdown, rerender, toast } from '../ui.js';
 
-const SUGGESTIONS = ['Составь мне простой уход', 'Можно ли сочетать ретинол и кислоты?', 'Что делать, если кожа стягивает?', 'Какие мои средства использовать вечером?'];
+const SUGGESTIONS = ['Съел гречку с курицей', 'Выпил 500 мл воды', 'Мой вес 85 кг', 'Отметь утренний уход', 'Напоминай про SPF в 11:00', 'Составь простой уход', 'Составь план похудения и сохрани'];
 const MAX_STORED = 100;
 
+// Отмена живёт до перезапуска приложения, поэтому в истории её нет.
+const undos = new Map();
 const chat = { messages: null, streaming: null, image: null, draft: '', abort: null };
 
 async function save() {
@@ -21,8 +25,26 @@ function setupCard(status) {
 
 function bubble(m) {
   const body = h('div.bubble');
-  if (m.role === 'assistant') body.append(renderMarkdown(m.content));
-  else {
+  if (m.role === 'assistant') {
+    body.append(renderMarkdown(m.content));
+    if (m.done?.length) {
+      body.append(h('ul.done-list', m.done.map((t) => h('li', icon('check', 15), t))));
+      if (undos.has(m.undoId)) {
+        body.append(h('button.link.left', {
+          type: 'button',
+          onclick: async () => {
+            await undos.get(m.undoId)();
+            undos.delete(m.undoId);
+            m.done = [];
+            m.content += '\n\nОтменено.';
+            await save();
+            toast('Отменено');
+            rerender();
+          },
+        }, 'Отменить'));
+      }
+    }
+  } else {
     if (m.image) body.append(h('img.bubble-img', { src: m.image, alt: 'Прикреплённое фото' }));
     if (m.hadImage) body.append(h('p.hint', 'Фото не сохраняется в истории'));
     if (m.content) body.append(h('p.pre', m.content));
@@ -46,11 +68,11 @@ async function send(text) {
     const context = await buildContext();
     const recent = chat.messages.slice(-24);
     const payload = recent.map(({ role, content: c, image }, i) => ({ role, content: c, ...(image && i === recent.length - 1 ? { image } : {}) }));
-    await streamChat({ messages: payload, context }, (delta) => {
+    await streamChat({ messages: payload, context, actions: true }, (delta) => {
       chat.streaming.text += delta;
       const el = chat.streaming.el;
       if (el?.isConnected) {
-        el.replaceChildren(renderMarkdown(chat.streaming.text));
+        el.replaceChildren(renderMarkdown(visibleText(chat.streaming.text)));
         window.scrollTo({ top: document.body.scrollHeight });
       }
     }, chat.abort.signal);
@@ -64,7 +86,18 @@ async function send(text) {
       }
     }
   }
-  if (chat.streaming.text) chat.messages.push({ role: 'assistant', content: chat.streaming.text });
+  if (chat.streaming.text) {
+    const answer = { role: 'assistant', content: visibleText(chat.streaming.text) || 'Готово.' };
+    const actions = chat.abort.signal.aborted ? [] : extractActions(chat.streaming.text);
+    if (actions.length) {
+      const { done, failed, undo } = await runActions(actions, answer.content);
+      answer.done = done;
+      answer.undoId = uid();
+      undos.set(answer.undoId, undo);
+      if (failed.length) toast(`Не всё получилось: ${failed.join('; ')}`, 'error');
+    }
+    chat.messages.push(answer);
+  }
   chat.streaming = null;
   chat.abort = null;
   await save();
@@ -79,13 +112,13 @@ export async function renderChat() {
 
   if (!chat.messages.length && !notice) {
     list.append(h('div.chat-empty',
-      h('p', 'Спросите об уходе, ингредиентах или своей косметике. Я учитываю ваш профиль, средства и дневник.'),
+      h('p', 'Пишите как другу: я отвечу на вопросы и сам запишу еду, воду, вес, тренировки, уход, напоминания и косметику.'),
       h('div.chips', SUGGESTIONS.map((s) => h('button.chip', { type: 'button', onclick: () => send(s) }, s)))));
   }
   list.append(...chat.messages.map(bubble));
   if (chat.streaming) {
     const el = h('div.bubble');
-    if (chat.streaming.text) el.append(renderMarkdown(chat.streaming.text));
+    if (visibleText(chat.streaming.text)) el.append(renderMarkdown(visibleText(chat.streaming.text)));
     else el.append(h('span.dots', h('i'), h('i'), h('i')));
     chat.streaming.el = el;
     list.append(h('div.msg.assistant', el));
