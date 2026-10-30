@@ -1,5 +1,5 @@
 import { startReminderLoop } from './notifications.js';
-import { getProfile } from './state.js';
+import { getProfile, getSettings, saveSettings } from './state.js';
 import { h, icon, toast } from './ui.js';
 import { renderAi } from './views/ai.js';
 import { renderDiary } from './views/diary.js';
@@ -85,6 +85,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 async function boot() {
+  await saveSettings(await getSettings());
   await render();
   startReminderLoop();
   if ('serviceWorker' in navigator) {

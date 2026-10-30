@@ -15,7 +15,7 @@ async function save() {
 }
 
 function setupCard(status) {
-  if (!status.ai) return h('div.notice', h('b', 'AI пока не подключён'), h('p', 'Добавьте ключ Grok в профиле. '), h('a.link-inline', { href: '#/profile' }, 'Открыть профиль'));
+  if (!status.ai) return h('div.notice', h('b', 'AI пока не подключён'), h('p', 'Добавьте бесплатный ключ OpenRouter в профиле. '), h('a.link-inline', { href: '#/profile' }, 'Открыть профиль'));
   if (status.offline) return h('div.notice', h('b', 'Нет интернета'), h('p', 'Для чата нужно соединение. Остальные разделы работают офлайн.'));
   return null;
 }

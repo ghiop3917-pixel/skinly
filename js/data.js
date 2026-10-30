@@ -21,8 +21,8 @@ export const DEFAULT_SETTINGS = {
   eveningTime: '21:30',
   spfTime: '12:00',
   notify: { enabled: false, morning: true, evening: true, spf: true },
-  apiKey: '',
-  model: 'grok-4.7',
+  aiKey: '',
+  aiModel: 'openrouter/free',
 };
 
 export const SKIN_TYPES = ['Нормальная', 'Сухая', 'Жирная', 'Комбинированная', 'Не знаю'];

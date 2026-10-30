@@ -9,8 +9,8 @@ const EXPORT_FORMAT = 'skinly-export';
 async function exportData() {
   const stores = {};
   for (const s of STORES) stores[s] = await db.all(s);
-  // Ключ Grok в файл экспорта не попадает.
-  stores.kv = stores.kv.map((row) => (row.id === 'settings' ? { ...row, value: { ...row.value, apiKey: '' } } : row));
+  // Ключ AI в файл экспорта не попадает.
+  stores.kv = stores.kv.map((row) => (row.id === 'settings' ? { ...row, value: { ...row.value, aiKey: '' } } : row));
   const blob = new Blob([JSON.stringify({ format: EXPORT_FORMAT, version: 1, exportedAt: new Date().toISOString(), stores })], { type: 'application/json' });
   const name = `skinly-${new Date().toISOString().slice(0, 10)}.json`;
   const file = new File([blob], name, { type: 'application/json' });
@@ -40,12 +40,12 @@ async function importData() {
     return;
   }
   if (!(await confirmSheet({ title: 'Загрузить данные?', text: 'Текущие данные на этом устройстве будут заменены данными из файла.', action: 'Заменить' }))) return;
-  const { apiKey } = await getSettings();
+  const { aiKey } = await getSettings();
   for (const s of STORES) {
     await db.clear(s);
     for (const row of data.stores[s] || []) await db.put(s, row);
   }
-  await saveSettings({ ...(await getSettings()), apiKey });
+  await saveSettings({ ...(await getSettings()), aiKey });
   resetChat();
   toast('Данные загружены');
   rerender();
@@ -62,7 +62,7 @@ function pickImportFile() {
 }
 
 async function deleteAll() {
-  if (!(await confirmSheet({ title: 'Удалить все данные?', text: 'Профиль, дневник, фото, косметика, прогресс, чат и ключ Grok будут удалены с этого устройства без возможности восстановления.', action: 'Удалить всё' }))) return;
+  if (!(await confirmSheet({ title: 'Удалить все данные?', text: 'Профиль, дневник, фото, косметика, прогресс, чат и ключ AI будут удалены с этого устройства без возможности восстановления.', action: 'Удалить всё' }))) return;
   for (const s of STORES) await db.clear(s);
   resetChat();
   location.hash = '#/home';
@@ -93,11 +93,11 @@ export async function renderProfile() {
       h('a.setting', { href: '#/reminders' }, h('b', 'Настройки уведомлений'), icon('right', 18))),
     h('section.card.stack',
       h('h3', 'AI'),
-      field('Ключ Grok', h('input', { type: 'password', autocomplete: 'off', value: settings.apiKey, placeholder: 'xai-…', onchange: async (e) => { settings.apiKey = e.target.value.trim(); await saveSettings(settings); toast(settings.apiKey ? 'Ключ сохранён' : 'Ключ удалён'); } }), 'Хранится только на этом устройстве и отправляется только в xAI. Не попадает в экспорт.'),
-      field('Модель', h('input', { type: 'text', autocomplete: 'off', value: settings.model, onchange: async (e) => { settings.model = e.target.value.trim() || 'grok-4.7'; await saveSettings(settings); } }))),
+      field('Ключ OpenRouter', h('input', { type: 'password', autocomplete: 'off', value: settings.aiKey, placeholder: 'sk-or-…', onchange: async (e) => { settings.aiKey = e.target.value.trim(); await saveSettings(settings); toast(settings.aiKey ? 'Ключ сохранён' : 'Ключ удалён'); } }), 'Бесплатный ключ на openrouter.ai. Хранится только на этом устройстве и отправляется только в OpenRouter. Не попадает в экспорт.'),
+      field('Модель', h('input', { type: 'text', autocomplete: 'off', value: settings.aiModel, onchange: async (e) => { settings.aiModel = e.target.value.trim() || 'openrouter/free'; await saveSettings(settings); } }))),
     h('section.card.stack',
       h('h3', 'Данные'),
-      h('p.muted', 'Профиль, дневник и фото хранятся только на этом устройстве. В xAI уходят ваш запрос и краткая сводка для ответа. Фото дневника не отправляются.'),
+      h('p.muted', 'Профиль, дневник и фото хранятся только на этом устройстве. В OpenRouter и выбранную им модель уходят ваш запрос и краткая сводка для ответа. Бесплатные модели могут использовать запросы для обучения. Фото дневника не отправляются.'),
       h('button.btn.ghost.wide', { type: 'button', onclick: exportData }, 'Экспорт данных'),
       h('button.btn.ghost.wide', { type: 'button', onclick: importData }, 'Загрузить из файла'),
       h('button.btn.ghost.wide.danger-text', { type: 'button', onclick: deleteAll }, 'Удалить все данные')),

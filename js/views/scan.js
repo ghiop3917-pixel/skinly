@@ -67,7 +67,7 @@ export async function renderScan(route) {
   return h('div.stack',
     blocked && h('div.notice',
       h('b', status.ai ? 'Нет интернета' : 'AI пока не подключён'),
-      status.ai ? h('p', 'Для анализа нужно соединение.') : h('a.link-inline', { href: '#/profile' }, 'Добавить ключ Grok в профиле')),
+      status.ai ? h('p', 'Для анализа нужно соединение.') : h('a.link-inline', { href: '#/profile' }, 'Добавить ключ OpenRouter в профиле')),
     h('section.card.stack',
       h('textarea', { rows: 5, value: ui.text, maxLength: 8000, 'aria-label': 'Состав', placeholder: 'Вставьте состав: Aqua, Glycerin, Niacinamide…', oninput: (e) => { ui.text = e.target.value; ui.title = ''; } }),
       ui.image && h('div.attach', h('img', { src: ui.image, alt: 'Фото состава' }), h('button.photo-del', { type: 'button', 'aria-label': 'Убрать фото', onclick: () => { ui.image = null; rerender(); } }, icon('close', 14))),

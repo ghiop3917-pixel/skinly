@@ -1,8 +1,8 @@
-// Прямое обращение к Grok из браузера. Ключ вводится в профиле и хранится только на этом устройстве.
+// Прямое обращение к OpenRouter из браузера. Ключ вводится в профиле и хранится только на этом устройстве.
 import { getSettings } from './state.js';
 
-const BASE_URL = 'https://api.x.ai/v1';
-const MAX_CONTEXT = 12000;
+const BASE_URL = 'https://openrouter.ai/api/v1';
+const MAX_CONTEXT = 6000;
 
 const SYSTEM_PROMPT = `Ты — Skinly, внимательный AI-помощник по уходу за кожей в приложении Skinly AI. Отвечай на русском языке, спокойно и по делу, простыми словами.
 
@@ -37,8 +37,8 @@ const ANALYZE_PROMPT = `Ты — эксперт по косметическим 
 }`;
 
 export async function getStatus() {
-  const { apiKey } = await getSettings();
-  return { ai: Boolean(apiKey), offline: !navigator.onLine };
+  const { aiKey } = await getSettings();
+  return { ai: Boolean(aiKey), offline: !navigator.onLine };
 }
 
 const contextBlock = (context) => `\n\n<user_data>\n${JSON.stringify(context).slice(0, MAX_CONTEXT)}\n</user_data>`;
@@ -52,27 +52,31 @@ function userContent(text, image) {
 }
 
 async function request(messages, stream, signal) {
-  const { apiKey, model } = await getSettings();
-  if (!apiKey) throw new Error('Добавьте ключ Grok в профиле.');
+  const { aiKey, aiModel } = await getSettings();
+  if (!aiKey) throw new Error('Добавьте ключ OpenRouter в профиле.');
   let res;
   try {
     res = await fetch(`${BASE_URL}/chat/completions`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json', authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify({ model, messages, stream }),
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${aiKey}`, 'x-title': 'Skinly AI' },
+      body: JSON.stringify({ model: aiModel, messages, stream }),
       signal,
     });
   } catch (err) {
     if (err.name === 'AbortError') throw err;
-    throw new Error('Не удалось связаться с Grok. Проверьте интернет.');
+    throw new Error('Не удалось связаться с AI. Проверьте интернет.');
   }
   if (res.ok) return res;
-  const detail = await res.text().catch(() => '');
-  if (res.status === 401 || res.status === 403 || /api key/i.test(detail)) throw new Error('Grok не принял ключ. Проверьте его в профиле и баланс на console.x.ai.');
-  if (res.status === 404 || /model/i.test(detail)) throw new Error('Модель не найдена. Проверьте название в профиле.');
-  if (res.status === 429) throw new Error('Превышен лимит Grok. Подождите немного и повторите.');
-  throw new Error('Grok вернул ошибку. Попробуйте ещё раз.');
+  if (res.status === 401 || res.status === 403) throw new Error('OpenRouter не принял ключ. Проверьте его в профиле.');
+  if (res.status === 402) throw new Error('OpenRouter сообщает об отрицательном балансе. Проверьте аккаунт на openrouter.ai.');
+  if (res.status === 404) throw new Error('Подходящая модель сейчас недоступна. Попробуйте позже или проверьте название в профиле.');
+  if (res.status === 429) throw new Error('Бесплатный лимит исчерпан: подождите минуту, а если не поможет, попробуйте завтра.');
+  throw new Error('AI вернул ошибку. Попробуйте ещё раз.');
 }
+
+// Некоторые бесплатные модели пишут рассуждения прямо в ответ.
+// Последняя замена прячет тег, который в потоке пришёл ещё не целиком.
+const stripThinking = (text) => text.replace(/<think>[\s\S]*?(<\/think>|$)/g, '').trimStart().replace(/^<[a-z]*$/, '');
 
 export async function streamChat({ messages, context }, onDelta, signal) {
   const history = messages.map((m, i) => ({
@@ -83,6 +87,8 @@ export async function streamChat({ messages, context }, onDelta, signal) {
   const decoder = new TextDecoder();
   const reader = res.body.getReader();
   let buffer = '';
+  let full = '';
+  let shown = 0;
   for (;;) {
     const { done, value } = await reader.read();
     if (done) return;
@@ -94,20 +100,27 @@ export async function streamChat({ messages, context }, onDelta, signal) {
       if (!line.startsWith('data:')) continue;
       const data = line.slice(5).trim();
       if (data === '[DONE]') return;
-      let delta;
+      let event;
       try {
-        delta = JSON.parse(data).choices?.[0]?.delta?.content;
+        event = JSON.parse(data);
       } catch {
         continue;
       }
-      if (delta) onDelta(delta);
+      if (event.error) throw new Error('Ответ AI прервался. Попробуйте ещё раз.');
+      full += event.choices?.[0]?.delta?.content || '';
+      const clean = stripThinking(full);
+      if (clean.length > shown) {
+        onDelta(clean.slice(shown));
+        shown = clean.length;
+      }
     }
   }
 }
 
 const list = (value) => (Array.isArray(value) ? value : []);
 
-function parseAnalysis(raw) {
+function parseAnalysis(content) {
+  const raw = stripThinking(content);
   let data;
   try {
     data = JSON.parse(raw.slice(raw.indexOf('{'), raw.lastIndexOf('}') + 1));
