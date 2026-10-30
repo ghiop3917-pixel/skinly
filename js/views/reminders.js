@@ -1,11 +1,11 @@
 import { REMINDER_PRESETS, WEEKDAYS, WEEK_INDEX } from '../data.js';
-import { buildReminders, disableNotifications, enableNotifications, environment } from '../notifications.js';
+import { buildReminders, disableNotifications, enableNotifications, environment, exportCalendar } from '../notifications.js';
 import { getCustomReminders, getSettings, saveCustomReminders, saveSettings, uid } from '../state.js';
 import { confirmSheet, field, h, icon, openSheet, rerender, toast } from '../ui.js';
 
 const BASE_TIME = { morning: 'morningTime', evening: 'eveningTime', spf: 'spfTime' };
 
-const OPEN_ONLY = 'Skinly работает без сервера, поэтому при закрытом приложении напоминания не придут.';
+const OPEN_ONLY = 'Эти уведомления приходят, только пока приложение открыто. Для закрытого приложения используйте календарь ниже.';
 
 function statusNote(env, settings) {
   if (env.isIOS && !env.standalone) return ['Только внутри приложения', `В Safari на iPhone системных уведомлений нет. ${OPEN_ONLY}`];
@@ -87,6 +87,10 @@ export async function renderReminders() {
     h('section.card',
       h('div.setting', h('div', h('b', 'Системные уведомления')), toggle(settings.notify.enabled, 'Системные уведомления', toggleMaster)),
       h('div.notice.inline', h('b', noteTitle), h('p', noteText))),
+    h('section.card.stack',
+      h('h3', 'Когда приложение закрыто'),
+      h('p.muted', 'Календарь iPhone напомнит вовремя, даже если Skinly закрыт. Если поменяете время, добавьте заново, а старые события удалите в Календаре.'),
+      h('button.btn.wide', { type: 'button', onclick: exportCalendar }, 'Добавить в календарь')),
     h('section.card',
       h('h3', 'Ежедневные'),
       reminders.filter((r) => r.kind === 'base').map((r) => h('div.setting',

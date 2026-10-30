@@ -35,6 +35,44 @@ export async function todayReminders() {
   return (await buildReminders()).filter((r) => r.enabled && r.days.includes(today));
 }
 
+const ICS_DAYS = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
+const icsText = (s) => String(s).replace(/([\\;,])/g, '\\$1').replace(/\n/g, '\\n');
+
+// Файл календаря: напоминания приходят от самого iPhone, поэтому работают при закрытом приложении.
+export function buildIcs(reminders, now = new Date()) {
+  const date = dateKey(now).replaceAll('-', '');
+  const stamp = now.toISOString().replace(/[-:]|\.\d+/g, '');
+  const events = reminders.map((r) => {
+    const rule = r.days.length === 7 ? 'FREQ=DAILY' : `FREQ=WEEKLY;BYDAY=${r.days.map((d) => ICS_DAYS[d]).join(',')}`;
+    const start = `${date}T${r.time.replace(':', '')}00`;
+    return [
+      'BEGIN:VEVENT', `UID:${r.id.replace(/[^\w-]/g, '-')}@skinly`, `DTSTAMP:${stamp}`, `DTSTART:${start}`, 'DURATION:PT5M', `RRULE:${rule}`,
+      `SUMMARY:${icsText(r.title)}`, `DESCRIPTION:${icsText(r.body || 'Skinly')}`, 'TRANSP:TRANSPARENT',
+      'BEGIN:VALARM', 'ACTION:DISPLAY', 'TRIGGER:PT0S', `DESCRIPTION:${icsText(r.title)}`, 'END:VALARM', 'END:VEVENT',
+    ];
+  });
+  return ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Skinly AI//RU', 'CALSCALE:GREGORIAN', ...events.flat(), 'END:VCALENDAR', ''].join('\r\n');
+}
+
+export async function exportCalendar() {
+  const reminders = (await buildReminders()).filter((r) => r.enabled);
+  if (!reminders.length) {
+    toast('Нет включённых напоминаний', 'error');
+    return;
+  }
+  const file = new File([buildIcs(reminders)], 'skinly.ics', { type: 'text/calendar' });
+  if (environment().standalone && navigator.canShare?.({ files: [file] })) {
+    await navigator.share({ files: [file], title: 'Напоминания Skinly' }).catch(() => {});
+    return;
+  }
+  const url = URL.createObjectURL(file);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'skinly.ics';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+
 export async function enableNotifications() {
   const env = environment();
   if (!env.notification) {

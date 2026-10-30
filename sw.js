@@ -1,6 +1,6 @@
 // Сеть в приоритете, чтобы обновления приходили сразу; кэш — для работы офлайн.
 // Пути относительные: на GitHub Pages приложение живёт в подпапке.
-const CACHE = 'skinly-v11';
+const CACHE = 'skinly-v13';
 const SHELL = [
   './', 'manifest.webmanifest', 'css/app.css', 'icons/icon-192.png',
   'js/app.js', 'js/actions.js', 'js/api.js', 'js/context.js', 'js/data.js', 'js/db.js', 'js/fitness.js', 'js/foods.js', 'js/notifications.js', 'js/state.js', 'js/ui.js',
