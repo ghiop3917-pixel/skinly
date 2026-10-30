@@ -23,6 +23,8 @@ const ICONS = {
   moon: '<path d="M19.500 14.500A8 8 0 0 1 9.500 4.500a8 8 0 1 0 10 10z"/>',
   flask: '<path d="M10 3h4M11 3v6l-5.500 9.500A1.700 1.700 0 0 0 7 21h10a1.700 1.700 0 0 0 1.500-2.500L13 9V3"/><path d="M8 15h8"/>',
   chat: '<path d="M4 5h16v12H9l-5 4z"/>',
+  flame: '<path d="M12 3c1 4 5 6 5 11a5 5 0 0 1-10 0c0-2 1-3 2-4 0 2 1 3 2 3 1-3-1-6 1-10z"/>',
+  copy: '<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a1 1 0 0 1 1-1h10"/>',
 };
 
 export function icon(name, size = 22) {

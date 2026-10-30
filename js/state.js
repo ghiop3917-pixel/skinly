@@ -1,5 +1,6 @@
 import { DEFAULT_PROFILE, DEFAULT_ROUTINES, DEFAULT_SETTINGS } from './data.js';
 import { db, kvGet, kvSet } from './db.js';
+import { DEFAULT_HABITS } from './fitness.js';
 
 export const uid = () => crypto.randomUUID();
 
@@ -46,6 +47,28 @@ export async function toggleStep(date, stepId) {
 export function progress(steps, day) {
   const done = steps.filter((s) => day.done[s.id]).length;
   return { done, total: steps.length, ratio: steps.length ? done / steps.length : 0 };
+}
+
+export const getFitGoal = () => kvGet('fitGoal', null);
+export const saveFitGoal = (g) => kvSet('fitGoal', g);
+export const getHabits = () => kvGet('fitHabits', DEFAULT_HABITS);
+export const saveHabits = (h) => kvSet('fitHabits', h);
+export const getPlans = () => kvGet('fitPlans', []);
+export const savePlans = (p) => kvSet('fitPlans', p);
+export const getFast = () => kvGet('fitFast', null);
+export const saveFast = (f) => kvSet('fitFast', f);
+
+export const getFitDay = async (date) => ({ id: date, weight: null, water: 0, steps: null, sleep: null, foods: [], workouts: [], habits: {}, measures: null, ...(await db.get('fit', date)) });
+
+export async function updateFitDay(date, change) {
+  const day = await getFitDay(date);
+  change(day);
+  await db.put('fit', day);
+}
+
+export async function getFitDays() {
+  const all = await db.all('fit');
+  return all.sort((a, b) => a.id.localeCompare(b.id)).map((d) => ({ foods: [], workouts: [], habits: {}, water: 0, ...d }));
 }
 
 export async function getDiary() {

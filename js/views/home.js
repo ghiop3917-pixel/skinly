@@ -1,6 +1,7 @@
 import { OVERALL } from '../data.js';
+import { dayTotals, targets } from '../fitness.js';
 import { todayReminders } from '../notifications.js';
-import { dateKey, getDay, getDiary, getProducts, getProfile, getRoutines, getStreak, parseKey, progress, toggleStep } from '../state.js';
+import { dateKey, getDay, getDiary, getFitDay, getFitDays, getFitGoal, getProducts, getProfile, getRoutines, getStreak, parseKey, progress, toggleStep } from '../state.js';
 import { bar, formatDate, h, icon, plural, rerender, ring } from '../ui.js';
 
 function greeting(hour) {
@@ -41,11 +42,22 @@ function routineCard(title, ic, steps, day, prog, part) {
     !steps.length && h('p.muted', 'Этапов пока нет.'));
 }
 
+function fitCard(goal, fitDay, days) {
+  const weight = days.filter((d) => d.weight).pop()?.weight;
+  const norm = goal && weight ? targets(goal, weight) : null;
+  const eaten = dayTotals(fitDay).kcal;
+  return h('a.card.link-card', { href: '#/fit' },
+    h('div.card-title', icon('flame', 20), h('h3', 'Форма')),
+    norm
+      ? [h('p.big', `${eaten} / ${norm.kcal}`), h('p.muted', `ккал · вода ${fitDay.water} мл · вес ${weight} кг`)]
+      : h('p.muted', 'Настройте цель: норма калорий, план похудения и график веса'));
+}
+
 export async function renderHome() {
   const now = new Date();
   const hour = now.getHours();
-  const [profile, routines, day, diary, products, reminders, streak] = await Promise.all([
-    getProfile(), getRoutines(), getDay(dateKey()), getDiary(), getProducts(), todayReminders(), getStreak(),
+  const [profile, routines, day, diary, products, reminders, streak, goal, fitDay, fitDays] = await Promise.all([
+    getProfile(), getRoutines(), getDay(dateKey()), getDiary(), getProducts(), todayReminders(), getStreak(), getFitGoal(), getFitDay(dateKey()), getFitDays(),
   ]);
   const morning = progress(routines.morning, day);
   const evening = progress(routines.evening, day);
@@ -68,6 +80,7 @@ export async function renderHome() {
     h('div.grid',
       routineCard('Утро', 'sun', routines.morning, day, morning, 'morning'),
       routineCard('Вечер', 'moon', routines.evening, day, evening, 'evening'),
+      fitCard(goal, fitDay, fitDays),
       h('a.card.ai-card', { href: '#/ai/chat' },
         h('span.ai-badge', icon('spark', 22)),
         h('div', h('h3', 'Спросить Skinly'), h('p.muted', 'Уход, ингредиенты, сочетания средств')),

@@ -241,6 +241,28 @@ input.time { width: auto; min-width: 96px; padding: 8px 10px; text-align: center
 .item-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; justify-content: space-between; }
 .plain { padding-left: 18px; list-style: disc; }
 
+/* Форма */
+.macro { display: flex; flex-direction: column; gap: 5px; }
+.quad { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.quad.two { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.mini-stat { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.stat-row { display: flex; align-items: center; gap: 6px; }
+.stat-row input { min-width: 0; padding: 9px 10px; }
+.composer-inline { display: flex; gap: 8px; align-items: center; }
+.composer-inline input { flex: 1; min-width: 0; }
+.plan-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.plan-btn { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; min-height: 84px; padding: 14px; text-align: left; font-weight: 600; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
+.plan-btn .icon { color: var(--accent); }
+.plan-text { display: flex; flex-direction: column; gap: 7px; overflow-wrap: anywhere; }
+.plan-text ul { padding-left: 18px; list-style: disc; display: flex; flex-direction: column; gap: 3px; }
+.saved summary { display: flex; align-items: center; justify-content: space-between; gap: 10px; cursor: pointer; list-style: none; }
+.saved summary::-webkit-details-marker { display: none; }
+.chart { display: block; width: 100%; height: auto; touch-action: pan-y; cursor: crosshair; }
+.chart-line { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.chart-goal { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 4 4; }
+.chart-dot { fill: var(--accent); stroke: var(--surface); stroke-width: 2; }
+.chart-tip { font-size: 14px; color: var(--ink); }
+
 /* Окна и уведомления */
 .overlay { position: fixed; inset: 0; z-index: 30; background: rgba(0, 0, 0, .6); display: flex; align-items: flex-end; justify-content: center; animation: fade .2s; }
 .overlay.out { opacity: 0; transition: opacity .2s; }

@@ -1,10 +1,25 @@
 import { LEVELS, OILINESS, OVERALL } from './data.js';
-import { getDiary, getProducts, getProfile, getRoutines } from './state.js';
+import { dayTotals, targets, weekSummary } from './fitness.js';
+import { getDiary, getFitDays, getFitGoal, getProducts, getProfile, getRoutines } from './state.js';
+
+function fitContext(goal, days) {
+  const weights = days.filter((d) => d.weight);
+  const current = weights[weights.length - 1]?.weight;
+  const today = days[days.length - 1];
+  return {
+    goal: goal && { sex: goal.sex, age: goal.age, height: goal.height, targetWeight: goal.targetWeight },
+    norm: goal && current ? targets(goal, current) : null,
+    weights: weights.slice(-5).map((d) => ({ date: d.id, weight: d.weight })),
+    lastDay: today && { date: today.id, ...dayTotals(today), foods: today.foods.map((f) => f.name).slice(0, 10) },
+    week: weekSummary(days.slice(-7)),
+  };
+}
 
 // Сводка для AI. Фотографии дневника и косметики сюда намеренно не входят.
 export async function buildContext() {
-  const [profile, products, diary, routines] = await Promise.all([getProfile(), getProducts(), getDiary(), getRoutines()]);
+  const [profile, products, diary, routines, goal, days] = await Promise.all([getProfile(), getProducts(), getDiary(), getRoutines(), getFitGoal(), getFitDays()]);
   return {
+    fitness: fitContext(goal, days),
     profile: {
       name: profile.name,
       skinType: profile.skinType,

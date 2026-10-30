@@ -1,7 +1,7 @@
 // Локальное хранилище на IndexedDB: данные и фото остаются на устройстве.
 const NAME = 'skinly';
-const VERSION = 1;
-export const STORES = ['kv', 'days', 'diary', 'products', 'analyses'];
+const VERSION = 2;
+export const STORES = ['kv', 'days', 'diary', 'products', 'analyses', 'fit'];
 
 let opening;
 
@@ -14,7 +14,11 @@ function open() {
         if (!req.result.objectStoreNames.contains(s)) req.result.createObjectStore(s, { keyPath: 'id' });
       }
     };
-    req.onsuccess = () => resolve(req.result);
+    req.onsuccess = () => {
+      // Новая версия в другой вкладке не должна ждать закрытия этой.
+      req.result.onversionchange = () => req.result.close();
+      resolve(req.result);
+    };
     req.onerror = () => reject(req.error);
   });
   return opening;

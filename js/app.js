@@ -3,6 +3,7 @@ import { getProfile, getSettings, saveSettings } from './state.js';
 import { h, icon, toast } from './ui.js';
 import { renderAi } from './views/ai.js';
 import { renderDiary } from './views/diary.js';
+import { renderFit } from './views/fit.js';
 import { renderHome } from './views/home.js';
 import { renderOnboarding } from './views/onboarding.js';
 import { renderProducts } from './views/products.js';
@@ -10,10 +11,11 @@ import { renderProfile } from './views/profile.js';
 import { renderReminders } from './views/reminders.js';
 import { renderRoutine } from './views/routine.js';
 
-const ROUTES = { home: renderHome, routine: renderRoutine, diary: renderDiary, products: renderProducts, ai: renderAi, profile: renderProfile, reminders: renderReminders };
+const ROUTES = { home: renderHome, routine: renderRoutine, fit: renderFit, diary: renderDiary, products: renderProducts, ai: renderAi, profile: renderProfile, reminders: renderReminders };
 const TABS = [
   ['home', 'Главная', 'home'],
   ['routine', 'Уход', 'drop'],
+  ['fit', 'Форма', 'flame'],
   ['diary', 'Дневник', 'book'],
   ['products', 'Косметика', 'bottle'],
   ['ai', 'AI', 'spark'],
