@@ -1,6 +1,7 @@
 // Прямое обращение к OpenRouter из браузера. Ключ вводится в профиле и хранится только на этом устройстве.
 import { modelChain } from './data.js';
 import { getSettings } from './state.js';
+import { toast } from './ui.js';
 
 const BASE_URL = 'https://openrouter.ai/api/v1';
 const KEYLESS_URL = 'https://text.pollinations.ai/openai';
@@ -47,6 +48,8 @@ const ANALYZE_PROMPT = `Ты — эксперт по косметическим 
 const ACTIONS_PROMPT = `
 
 Ты управляешь приложением. Если пользователь в своём сообщении просит что-то записать, добавить, отметить, изменить или сообщает факт для записи («съел», «выпил», «вешу», «поспал», «сделал»), выполни это: коротко подтверди и в самом конце ответа добавь блок действий. Не говори, что не можешь, и не проси сделать вручную. Если просьба только о совете, блок не добавляй.
+
+Единицы переводи точно: стакан — 250 мл, пол-литра — 500 мл, литр — 1000 мл, бутылка — 500 мл.
 
 Формат блока, строго JSON-массив:
 <actions>[{"action":"add_water","ml":500}]</actions>
@@ -121,6 +124,7 @@ async function keyless(messages, stream, signal) {
   const res = await send();
   if (res.status !== 402 && res.status !== 429) return res;
   const seconds = Number((await res.text()).match(/after (\d+)\s*s/i)?.[1]) || 30;
+  toast(`Бесплатный режим: отвечу примерно через ${seconds + 1} сек.`);
   await sleep((seconds + 1) * 1000, signal);
   return send();
 }

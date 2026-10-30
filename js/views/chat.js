@@ -3,7 +3,7 @@ import { getStatus, streamChat } from '../api.js';
 import { buildContext } from '../context.js';
 import { kvGet, kvSet } from '../db.js';
 import { uid } from '../state.js';
-import { confirmSheet, h, icon, pickPhoto, renderMarkdown, rerender, toast } from '../ui.js';
+import { confirmSheet, go, h, icon, pickPhoto, renderMarkdown, rerender, toast } from '../ui.js';
 
 const SUGGESTIONS = ['Съел гречку с курицей', 'Выпил 500 мл воды', 'Мой вес 85 кг', 'Отметь утренний уход', 'Напоминай про SPF в 11:00', 'Составь простой уход', 'Составь план похудения и сохрани'];
 const MAX_STORED = 100;
@@ -27,6 +27,9 @@ function bubble(m) {
   const body = h('div.bubble');
   if (m.role === 'assistant') {
     body.append(renderMarkdown(m.content));
+    if (m.content.length > 200) {
+      body.append(h('button.link.left', { type: 'button', onclick: async () => { await navigator.clipboard.writeText(m.content); toast('Скопировано'); } }, 'Копировать'));
+    }
     if (m.done?.length) {
       body.append(h('ul.done-list', m.done.map((t) => h('li', icon('check', 15), t))));
       if (undos.has(m.undoId)) {
@@ -94,7 +97,7 @@ async function send(text) {
       answer.done = done;
       answer.undoId = uid();
       undos.set(answer.undoId, undo);
-      if (failed.length) toast(`Не всё получилось: ${failed.join('; ')}`, 'error');
+      if (failed.length) toast('Часть действий не выполнена. Проверьте значения и повторите.', 'error');
     }
     chat.messages.push(answer);
   }
@@ -104,8 +107,19 @@ async function send(text) {
   rerender();
 }
 
+// Открывает чат и сразу отправляет сообщение: так работает ввод с главной и из дневника.
+export function askChat(text) {
+  chat.pending = text;
+  go('#/ai/chat');
+}
+
 export async function renderChat() {
   if (!chat.messages) chat.messages = await kvGet('chat', []);
+  if (chat.pending) {
+    const text = chat.pending;
+    chat.pending = null;
+    setTimeout(() => send(text));
+  }
   const status = await getStatus();
   const notice = setupCard(status);
   const list = h('div.messages');

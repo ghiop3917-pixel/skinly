@@ -1,3 +1,4 @@
+import { ROUTINE_PRESETS } from '../data.js';
 import { addDays, dateKey, getDay, getRoutines, parseKey, progress, saveRoutines, toggleStep, uid } from '../state.js';
 import { bar, confirmSheet, field, formatDate, h, icon, openSheet, rerender, segmented, toast } from '../ui.js';
 
@@ -101,5 +102,17 @@ export async function renderRoutine(route) {
         h('button.icon-btn', { type: 'button', disabled: i === 0, 'aria-label': 'Выше', onclick: () => move(routines, part, i, -1) }, icon('up', 19)),
         h('button.icon-btn', { type: 'button', disabled: i === steps.length - 1, 'aria-label': 'Ниже', onclick: () => move(routines, part, i, 1) }, icon('down', 19)))))),
     !steps.length && h('p.empty', 'В этой рутине пока нет этапов.'),
+    ui.editing && h('section.card',
+      h('h3', 'Готовые рутины'),
+      h('div.chips', ROUTINE_PRESETS.map(([name, preset]) => h('button.chip', {
+        type: 'button',
+        onclick: async () => {
+          if (!(await confirmSheet({ title: `Рутина «${name}»`, text: 'Утренние и вечерние этапы будут заменены. Отметки за прошлые дни останутся в истории.', action: 'Заменить', danger: false }))) return;
+          const withIds = (list) => list.map((s) => ({ ...s, id: uid() }));
+          ui.editing = false;
+          await persist({ morning: withIds(preset.morning), evening: withIds(preset.evening) });
+          toast('Рутина обновлена');
+        },
+      }, name)))),
     h('button.btn.ghost.wide', { type: 'button', onclick: () => editStep(routines, part, null) }, icon('plus', 18), 'Добавить этап'));
 }

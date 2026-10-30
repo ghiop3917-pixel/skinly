@@ -1,8 +1,10 @@
 import { OVERALL } from '../data.js';
 import { dayTotals, targets } from '../fitness.js';
 import { todayReminders } from '../notifications.js';
-import { dateKey, getDay, getDiary, getFitDay, getFitDays, getFitGoal, getProducts, getProfile, getRoutines, getStreak, parseKey, progress, toggleStep } from '../state.js';
-import { bar, formatDate, h, icon, plural, rerender, ring } from '../ui.js';
+import { dateKey, getDay, getDiary, getFitDay, getFitDays, getFitGoal, getProducts, getProfile, getRoutines, getStreak, parseKey, progress, toggleStep, updateFitDay } from '../state.js';
+import { bar, formatDate, h, icon, plural, rerender, ring, toast } from '../ui.js';
+import { askChat } from './chat.js';
+import { openAddFood } from './fit.js';
 
 function greeting(hour) {
   if (hour < 5) return 'Доброй ночи';
@@ -42,6 +44,16 @@ function routineCard(title, ic, steps, day, prog, part) {
     !steps.length && h('p.muted', 'Этапов пока нет.'));
 }
 
+function quickAsk() {
+  const input = h('input', { type: 'text', maxLength: 500, placeholder: 'Съел, выпил, вес, вопрос…', 'aria-label': 'Сообщение для Skinly' });
+  return h('form.quick-ai', {
+    onsubmit: (e) => {
+      e.preventDefault();
+      if (input.value.trim()) askChat(input.value.trim());
+    },
+  }, icon('spark', 20), input, h('button.send', { type: 'submit', 'aria-label': 'Отправить' }, icon('send', 20)));
+}
+
 function fitCard(goal, fitDay, days) {
   const weight = days.filter((d) => d.weight).pop()?.weight;
   const norm = goal && weight ? targets(goal, weight) : null;
@@ -76,15 +88,17 @@ export async function renderHome() {
         h('p.eyebrow', 'На сегодня'),
         h('p.hero-tip', tip({ hour, morning, evening, entry, products: products.length, routines }))),
       ring(all.ratio, `${Math.round(all.ratio * 100)}%`)),
+    quickAsk(),
+    h('div.quick-row',
+      h('button.chip', { type: 'button', onclick: async () => { await updateFitDay(dateKey(), (d) => { d.water += 250; }); toast('Вода: +250 мл'); rerender(); } }, '+250 мл воды'),
+      h('button.chip', { type: 'button', onclick: openAddFood }, 'Еда'),
+      h('a.chip', { href: '#/fit/progress' }, 'Вес'),
+      h('a.chip', { href: '#/fit/plan' }, 'Планы')),
     streak > 0 && h('p.streak', `${streak} ${plural(streak, 'день', 'дня', 'дней')} ухода подряд`),
     h('div.grid',
       routineCard('Утро', 'sun', routines.morning, day, morning, 'morning'),
       routineCard('Вечер', 'moon', routines.evening, day, evening, 'evening'),
       fitCard(goal, fitDay, fitDays),
-      h('a.card.ai-card', { href: '#/ai/chat' },
-        h('span.ai-badge', icon('spark', 22)),
-        h('div', h('h3', 'Спросить Skinly'), h('p.muted', 'Уход, ингредиенты, сочетания средств')),
-        icon('right', 20)),
       h('a.card.link-card', { href: entry ? `#/diary/${entry.id}` : '#/diary' },
         h('div.card-title', icon('book', 20), h('h3', 'Последняя запись')),
         entry

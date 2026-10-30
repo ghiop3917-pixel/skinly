@@ -2,6 +2,7 @@ import { LEVELS, OILINESS, OVERALL } from '../data.js';
 import { db } from '../db.js';
 import { dateKey, getDiary, getProducts, parseKey } from '../state.js';
 import { chips, confirmSheet, field, formatDate, h, icon, openSheet, pickPhoto, rerender, toast } from '../ui.js';
+import { askChat } from './chat.js';
 
 const MAX_PHOTOS = 3;
 const METRICS = [['overall', 'Общее состояние', OVERALL], ['oiliness', 'Сухость / жирность', OILINESS], ['redness', 'Покраснения', LEVELS], ['breakouts', 'Высыпания', LEVELS], ['sensitivity', 'Чувствительность', LEVELS]];
@@ -129,6 +130,7 @@ export async function renderDiary(route) {
     h('div.grid',
       calendar(entries, selected),
       entryDetails(selected, entries.get(selected))),
+    list.length > 0 && h('button.btn.ghost.wide', { type: 'button', onclick: () => askChat('Разбери мой дневник кожи: что меняется, что могло на это повлиять и что поправить в уходе.') }, icon('spark', 18), 'Разобрать дневник с AI'),
     h('h2.section-title', 'История изменений'),
     list.length
       ? h('ul.history', list.slice(0, 30).map((e, i) => {

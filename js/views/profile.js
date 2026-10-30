@@ -1,7 +1,7 @@
 import { PREFERENCES, SENSITIVITY, SKIN_TYPES } from '../data.js';
-import { STORES, db } from '../db.js';
+import { STORES, db, kvGet, kvSet } from '../db.js';
 import { getProfile, getSettings, saveProfile, saveSettings } from '../state.js';
-import { chips, confirmSheet, field, h, icon, rerender, toast } from '../ui.js';
+import { chips, confirmSheet, field, formatDate, h, icon, rerender, toast } from '../ui.js';
 import { resetChat } from './chat.js';
 
 const EXPORT_FORMAT = 'skinly-export';
@@ -16,14 +16,17 @@ async function exportData() {
   const file = new File([blob], name, { type: 'application/json' });
   // В приложении с экрана «Домой» на iPhone скачивание по ссылке ненадёжно, там есть системное меню.
   if (navigator.canShare?.({ files: [file] }) && matchMedia('(hover: none)').matches) {
-    await navigator.share({ files: [file], title: 'Данные Skinly' }).catch(() => {});
+    await navigator.share({ files: [file], title: 'Данные Skinly' }).then(() => kvSet('lastExport', new Date().toISOString())).catch(() => {});
+    rerender();
     return;
   }
   const url = URL.createObjectURL(blob);
   const a = h('a', { href: url, download: name });
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 5000);
+  await kvSet('lastExport', new Date().toISOString());
   toast('Файл с данными сохранён');
+  rerender();
 }
 
 async function importData() {
@@ -70,7 +73,7 @@ async function deleteAll() {
 }
 
 export async function renderProfile() {
-  const [profile, settings] = await Promise.all([getProfile(), getSettings()]);
+  const [profile, settings, lastExport] = await Promise.all([getProfile(), getSettings(), kvGet('lastExport', null)]);
   const save = async () => { await saveProfile(profile); };
   const saveTime = (key) => async (e) => {
     if (!e.target.value) return;
@@ -98,6 +101,7 @@ export async function renderProfile() {
     h('section.card.stack',
       h('h3', 'Данные'),
       h('p.muted', 'Профиль, дневник и фото хранятся только на этом устройстве. В бесплатный AI-сервис (Pollinations или OpenRouter) уходят ваш запрос и краткая сводка для ответа. Такие сервисы могут использовать запросы для обучения. Фото дневника не отправляются.'),
+      h('p.hint', lastExport ? `Последняя копия: ${formatDate(new Date(lastExport), { day: 'numeric', month: 'long' })}` : 'Резервной копии ещё нет. Сделайте её, чтобы не потерять записи при смене телефона.'),
       h('button.btn.ghost.wide', { type: 'button', onclick: exportData }, 'Экспорт данных'),
       h('button.btn.ghost.wide', { type: 'button', onclick: importData }, 'Загрузить из файла'),
       h('button.btn.ghost.wide.danger-text', { type: 'button', onclick: deleteAll }, 'Удалить все данные')),

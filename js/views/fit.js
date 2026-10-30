@@ -8,7 +8,8 @@ import {
 import { bar, chips, confirmSheet, field, formatDate, go, h, icon, openSheet, pickPhoto, renderMarkdown, rerender, ring, segmented, toast } from '../ui.js';
 
 const POPULAR = ['Овсянка на воде', 'Яйцо варёное', 'Куриная грудка', 'Гречка варёная', 'Творог 5%', 'Банан', 'Кофе чёрный', 'Салат овощной'];
-const ui = { tab: 'today' };
+const ui = { tab: 'today', date: null };
+const fitDate = () => ui.date || dateKey();
 const generation = { kind: null, text: '', el: null, abort: null };
 const num = (v) => {
   const x = parseFloat(String(v).replace(',', '.'));
@@ -23,8 +24,17 @@ const PLANS = [
   ['week', 'Меню на неделю', 'Составь простое меню на 7 дней в пределах моей нормы калорий. Блюда из обычных продуктов, без сложных рецептов.'],
   ['workout', 'Тренировки', 'Составь план тренировок на неделю для похудения с учётом моего уровня: упражнения, подходы, время. Что можно делать дома без инвентаря.'],
   ['shop', 'Список покупок', 'Составь список покупок на неделю под моё меню для похудения, сгруппируй по отделам магазина.'],
+  ['day', 'Разбор дня', 'Разбери мой сегодняшний день по данным из раздела «Форма»: питание, вода, активность, сон. Что получилось и что сделать завтра.'],
   ['tip', 'Разбор недели', 'Разбери мою неделю по данным из раздела «Форма»: что идёт хорошо, что мешает и 3 конкретных шага на следующую неделю.'],
 ];
+
+// Открывает «Форму» сразу с окном добавления еды.
+export function openAddFood() {
+  ui.tab = 'today';
+  ui.date = null;
+  ui.openFood = true;
+  go('#/fit/today');
+}
 
 function editGoal(goal, weight) {
   const draft = { sex: '', activity: 1.375, pace: 0.5, ...goal };
@@ -103,7 +113,7 @@ function addFood(recent) {
         e.preventDefault();
         const food = { id: uid(), meal: draft.meal, name: name.value.trim(), kcal: Math.round(num(kcal.value) || 0), protein: num(protein.value) || 0, fat: num(fat.value) || 0, carbs: num(carbs.value) || 0 };
         if (!food.name) { toast('Напишите название', 'error'); return; }
-        await updateFitDay(today(), (d) => { d.foods.push(food); });
+        await updateFitDay(fitDate(), (d) => { d.foods.push(food); });
         close();
         rerender();
       },
@@ -128,7 +138,7 @@ function addWorkout(weight) {
         const m = num(minutes.value);
         if (!m) { toast('Укажите минуты', 'error'); return; }
         const met = WORKOUTS.find(([n]) => n === draft.type)[1];
-        await updateFitDay(today(), (d) => { d.workouts.push({ id: uid(), type: draft.type, minutes: m, kcal: weight ? workoutKcal(met, weight, m) : 0 }); });
+        await updateFitDay(fitDate(), (d) => { d.workouts.push({ id: uid(), type: draft.type, minutes: m, kcal: weight ? workoutKcal(met, weight, m) : 0 }); });
         close();
         rerender();
       },
@@ -181,18 +191,37 @@ function fastCard(fast) {
 }
 
 async function renderToday(goal, weight) {
-  const [day, habits, fast, all] = await Promise.all([getFitDay(today()), getHabits(), getFast(), getFitDays()]);
+  const [day, habits, fast, all] = await Promise.all([getFitDay(fitDate()), getHabits(), getFast(), getFitDays()]);
+  const isToday = fitDate() === today();
+  const shiftDay = (n) => () => {
+    const next = addDays(fitDate(), n);
+    ui.date = next >= today() ? null : next;
+    rerender();
+  };
+  const fed = new Set(all.filter((d) => d.foods.length).map((d) => d.id));
+  let streak = 0;
+  for (let key = fed.has(today()) ? today() : addDays(today(), -1); fed.has(key); key = addDays(key, -1)) streak += 1;
   const totals = dayTotals(day);
   const norm = goal && weight ? targets(goal, weight) : null;
   const left = norm ? norm.kcal - totals.kcal + totals.burned : 0;
   const recent = [...new Map(all.slice(-14).flatMap((d) => d.foods).reverse().map((f) => [f.name, f])).values()].slice(0, 8);
+  if (ui.openFood) {
+    ui.openFood = false;
+    setTimeout(() => addFood(recent));
+  }
+  const previous = all.find((d) => d.id === addDays(fitDate(), -1));
   const macro = (label, have, need) => h('div.macro', h('div.card-head', h('span.muted', label), h('span.muted', `${Math.round(have)} / ${need} г`)), bar(Math.min(1, have / (need || 1))));
-  const setWater = (delta) => async () => { await updateFitDay(today(), (d) => { d.water = Math.max(0, d.water + delta); }); rerender(); };
+  const setWater = (delta) => async () => { await updateFitDay(fitDate(), (d) => { d.water = Math.max(0, d.water + delta); }); rerender(); };
 
   return h('div.stack',
+    h('div.day-switch',
+      h('button.icon-btn', { type: 'button', 'aria-label': 'Предыдущий день', onclick: shiftDay(-1) }, icon('left', 20)),
+      h('b', isToday ? 'Сегодня' : formatDate(parseKey(fitDate()), { day: 'numeric', month: 'long' })),
+      h('button.icon-btn', { type: 'button', disabled: isToday, 'aria-label': 'Следующий день', onclick: shiftDay(1) }, icon('right', 20))),
+    streak > 0 && h('p.streak', `${streak} дн. подряд с записями еды`),
     norm && h('section.hero',
       h('div.hero-text',
-        h('p.eyebrow', 'Осталось на сегодня'),
+        h('p.eyebrow', isToday ? 'Осталось на сегодня' : 'Остаток дня'),
         h('p.hero-tip', left >= 0 ? `${left} ккал` : `Сверх нормы на ${-left} ккал`),
         h('p.muted', `Съедено ${totals.kcal} из ${norm.kcal}${totals.burned ? `, сожжено ${totals.burned}` : ''}`)),
       ring(Math.min(1, totals.kcal / norm.kcal), `${Math.round((totals.kcal / norm.kcal) * 100)}%`)),
@@ -201,27 +230,35 @@ async function renderToday(goal, weight) {
       h('div.card-head', h('h3', 'Еда'), h('button.btn.small', { type: 'button', onclick: () => addFood(recent) }, icon('plus', 17), 'Добавить')),
       day.foods.length ? day.foods.map((f) => h('div.setting',
         h('div', h('b', f.name), h('span.muted', `${f.meal} · ${f.kcal} ккал`)),
-        h('button.icon-btn', { type: 'button', 'aria-label': `Удалить: ${f.name}`, onclick: async () => { await updateFitDay(today(), (d) => { d.foods = d.foods.filter((x) => x.id !== f.id); }); rerender(); } }, icon('trash', 18)))) : h('p.muted', 'Напишите или сфотографируйте еду, и AI посчитает калории.')),
+        h('button.icon-btn', { type: 'button', 'aria-label': `Удалить: ${f.name}`, onclick: async () => { await updateFitDay(fitDate(), (d) => { d.foods = d.foods.filter((x) => x.id !== f.id); }); rerender(); } }, icon('trash', 18)))) : h('p.muted', 'Напишите или сфотографируйте еду, и AI посчитает калории.')),
+    !day.foods.length && previous?.foods.length > 0 && h('button.btn.ghost.wide', {
+      type: 'button',
+      onclick: async () => {
+        await updateFitDay(fitDate(), (d) => { d.foods = previous.foods.map((f) => ({ ...f, id: uid() })); });
+        toast('Еда скопирована со вчерашнего дня');
+        rerender();
+      },
+    }, 'Как вчера'),
     h('section.card',
       h('div.card-head', h('h3', 'Вода'), h('span.count', `${day.water}${norm ? ` / ${norm.water}` : ''} мл`)),
       norm && bar(Math.min(1, day.water / norm.water)),
       h('div.row-actions', h('button.btn.ghost', { type: 'button', onclick: setWater(250) }, '+250'), h('button.btn.ghost', { type: 'button', onclick: setWater(500) }, '+500'), h('button.btn.ghost', { type: 'button', 'aria-label': 'Убрать 250 мл', onclick: setWater(-250) }, '−250'))),
     h('section.card',
       h('div.quad.two',
-        stepper('Шаги', day.steps, 'шагов', async (v) => { await updateFitDay(today(), (d) => { d.steps = v; }); rerender(); }),
-        stepper('Сон', day.sleep, 'часов', async (v) => { await updateFitDay(today(), (d) => { d.sleep = v; }); rerender(); }))),
+        stepper('Шаги', day.steps, 'шагов', async (v) => { await updateFitDay(fitDate(), (d) => { d.steps = v; }); rerender(); }),
+        stepper('Сон', day.sleep, 'часов', async (v) => { await updateFitDay(fitDate(), (d) => { d.sleep = v; }); rerender(); }))),
     h('section.card',
       h('div.card-head', h('h3', 'Тренировки'), h('button.btn.small', { type: 'button', onclick: () => addWorkout(weight) }, icon('plus', 17), 'Добавить')),
       day.workouts.length ? day.workouts.map((w) => h('div.setting',
         h('div', h('b', w.type), h('span.muted', `${w.minutes} мин · примерно ${w.kcal} ккал`)),
-        h('button.icon-btn', { type: 'button', 'aria-label': `Удалить: ${w.type}`, onclick: async () => { await updateFitDay(today(), (d) => { d.workouts = d.workouts.filter((x) => x.id !== w.id); }); rerender(); } }, icon('trash', 18)))) : h('p.muted', 'Сегодня тренировок нет.')),
+        h('button.icon-btn', { type: 'button', 'aria-label': `Удалить: ${w.type}`, onclick: async () => { await updateFitDay(fitDate(), (d) => { d.workouts = d.workouts.filter((x) => x.id !== w.id); }); rerender(); } }, icon('trash', 18)))) : h('p.muted', 'Сегодня тренировок нет.')),
     h('section.card',
       h('div.card-head', h('h3', 'Привычки'), h('button.btn.small.ghost', { type: 'button', onclick: () => editHabits(habits) }, 'Изменить')),
       h('ul.mini-steps', habits.map((name) => h('li', h('button.mini-step', {
         type: 'button',
         class: day.habits[name] ? 'done' : '',
         'aria-pressed': Boolean(day.habits[name]),
-        onclick: async () => { await updateFitDay(today(), (d) => { d.habits[name] = !d.habits[name]; }); rerender(); },
+        onclick: async () => { await updateFitDay(fitDate(), (d) => { d.habits[name] = !d.habits[name]; }); rerender(); },
       }, h('span.tick', icon('check', 15)), h('span', name)))))),
     fastCard(fast));
 }
@@ -318,6 +355,26 @@ function weightChart(points, goalWeight) {
   return h('div', tip, svg, goalWeight && h('p.hint', `Пунктир — цель ${goalWeight} кг`));
 }
 
+// Калории по дням: столбики на общей шкале, линия — норма, значение видно по нажатию.
+function weekBars(days, norm) {
+  const keys = Array.from({ length: 7 }, (_, i) => addDays(today(), i - 6));
+  const items = keys.map((key) => ({ key, kcal: dayTotals({ foods: [], workouts: [], ...days.find((d) => d.id === key) }).kcal }));
+  const top = Math.max(norm || 0, ...items.map((i) => i.kcal), 1);
+  const tip = h('p.chart-tip');
+  const show = (item) => {
+    const over = norm && item.kcal > norm ? `, выше нормы на ${item.kcal - norm}` : '';
+    tip.textContent = `${formatDate(parseKey(item.key), { day: 'numeric', month: 'long' })}: ${item.kcal} ккал${over}`;
+  };
+  show(items[items.length - 1]);
+  return h('div', tip,
+    h('div.week-bars',
+      norm && h('i.norm-line', { style: { bottom: `${(norm / top) * 100}%` } }),
+      items.map((item) => h('button.wbar', { type: 'button', 'aria-label': `${item.key}: ${item.kcal} ккал`, onclick: () => show(item) },
+        h('i', { style: { height: `${Math.max(item.kcal ? 2 : 0, (item.kcal / top) * 100)}%` } })))),
+    h('div.week-names', items.map((item) => h('span', formatDate(parseKey(item.key), { weekday: 'short' })))),
+    norm && h('p.hint', `Линия — норма ${norm} ккал`));
+}
+
 function addMeasures(prev) {
   openSheet('Замеры, см', (body, close) => {
     const waist = numInput(prev?.waist, 'Талия');
@@ -372,6 +429,9 @@ async function renderProgress(goal, weight) {
       norm.lowTarget && h('div.notice', h('b', 'Цель ниже здорового веса'), h('p', 'Для такого роста индекс массы тела будет меньше 18,5. Лучше обсудить цель с врачом.')),
       norm.minor && h('div.notice', h('b', 'До 18 лет дефицит не закладывается'), h('p', 'Норма рассчитана на поддержание. Снижение веса лучше обсудить с врачом.')),
       h('p.hint', 'Расчёты приблизительные и не заменяют консультацию врача.')),
+    h('section.card',
+      h('h3', 'Калории за неделю'),
+      weekBars(days, norm?.kcal)),
     h('section.card',
       h('h3', 'Итоги 7 дней'),
       h('div.quad.two',

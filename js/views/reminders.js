@@ -1,4 +1,4 @@
-import { WEEKDAYS, WEEK_INDEX } from '../data.js';
+import { REMINDER_PRESETS, WEEKDAYS, WEEK_INDEX } from '../data.js';
 import { buildReminders, disableNotifications, enableNotifications, environment } from '../notifications.js';
 import { getCustomReminders, getSettings, saveCustomReminders, saveSettings, uid } from '../state.js';
 import { confirmSheet, field, h, icon, openSheet, rerender, toast } from '../ui.js';
@@ -107,6 +107,14 @@ export async function renderReminders() {
           await saveCustomReminders(list.map((c) => (c.id === r.sourceId ? { ...c, enabled: on } : c)));
           rerender();
         }))),
-      !reminders.some((r) => r.kind === 'custom') && h('p.muted', 'Пока нет своих напоминаний.')),
+      !reminders.some((r) => r.kind === 'custom') && h('p.muted', 'Пока нет своих напоминаний.'),
+      h('div.chips', REMINDER_PRESETS.filter(([title]) => !reminders.some((r) => r.title === title)).map(([title, time, days]) => h('button.chip', {
+        type: 'button',
+        onclick: async () => {
+          await saveCustomReminders([...(await getCustomReminders()), { id: uid(), title, time, days: days || [0, 1, 2, 3, 4, 5, 6], enabled: true }]);
+          toast(`Напоминание: ${title} в ${time}`);
+          rerender();
+        },
+      }, `+ ${title}`)))),
     h('p.hint.center', 'Пока приложение открыто, напоминания показываются внутри него.'));
 }
