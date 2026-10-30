@@ -160,7 +160,16 @@ export async function streamChat({ messages, context, actions = false }, onDelta
     role: m.role,
     content: m.role === 'user' && i === messages.length - 1 ? userContent(m.content, m.image) : m.content,
   }));
-  const res = await request([{ role: 'system', content: SYSTEM_PROMPT + (actions ? ACTIONS_PROMPT : '') + contextBlock(context) }, ...history], true, signal);
+  const prompt = [{ role: 'system', content: SYSTEM_PROMPT + (actions ? ACTIONS_PROMPT : '') + contextBlock(context) }, ...history];
+  // Бесплатная модель иногда присылает пустой ответ: тогда спрашиваем ещё раз.
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    if (await readStream(await request(prompt, true, signal), onDelta)) return;
+  }
+  throw new Error('AI не ответил. Попробуйте ещё раз.');
+}
+
+// Возвращает true, если пользователь получил хоть какой-то текст.
+async function readStream(res, onDelta) {
   const decoder = new TextDecoder();
   const reader = res.body.getReader();
   let buffer = '';
@@ -168,7 +177,7 @@ export async function streamChat({ messages, context, actions = false }, onDelta
   let shown = 0;
   for (;;) {
     const { done, value } = await reader.read();
-    if (done) return;
+    if (done) return shown > 0;
     buffer += decoder.decode(value, { stream: true });
     let idx;
     while ((idx = buffer.indexOf('\n')) >= 0) {
@@ -176,7 +185,7 @@ export async function streamChat({ messages, context, actions = false }, onDelta
       buffer = buffer.slice(idx + 1);
       if (!line.startsWith('data:')) continue;
       const data = line.slice(5).trim();
-      if (data === '[DONE]') return;
+      if (data === '[DONE]') return shown > 0;
       let event;
       try {
         event = JSON.parse(data);

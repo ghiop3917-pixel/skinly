@@ -18,7 +18,8 @@ export function visibleText(text) {
 }
 
 export function extractActions(text) {
-  const match = text.match(/<actions>([\s\S]*?)<\/actions>/);
+  // Модель иногда не закрывает блок, поэтому конец текста тоже считается концом блока.
+  const match = text.match(/<actions>([\s\S]*?)(?:<\/actions>|$)/);
   if (!match) return [];
   try {
     const list = JSON.parse(match[1].replace(/^\s*```(?:json)?|```\s*$/g, ''));
