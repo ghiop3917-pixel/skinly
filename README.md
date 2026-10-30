@@ -52,6 +52,7 @@ js/api.js          обращение к AI и промпты
 js/db.js, state.js хранилище и данные
 js/data.js         значения по умолчанию и справочники
 js/fitness.js      расчёты раздела «Форма»
+js/foods.js        встроенная база еды
 js/context.js      сводка для AI
 js/notifications.js напоминания
 js/ui.js           компоненты интерфейса

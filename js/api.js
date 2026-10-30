@@ -70,6 +70,24 @@ const post = (url, headers, body, signal) => fetch(url, {
   signal,
 });
 
+const sleep = (ms, signal) => new Promise((resolve, reject) => {
+  const timer = setTimeout(resolve, ms);
+  signal?.addEventListener('abort', () => {
+    clearTimeout(timer);
+    reject(new DOMException('Отменено', 'AbortError'));
+  }, { once: true });
+});
+
+// Бесплатный режим даёт один ответ в 30 секунд: ждём сами, чтобы не просить нажимать повтор.
+async function keyless(messages, stream, signal) {
+  const send = () => post(KEYLESS_URL, {}, { model: KEYLESS_MODEL, messages, stream }, signal);
+  const res = await send();
+  if (res.status !== 402 && res.status !== 429) return res;
+  const seconds = Number((await res.text()).match(/after (\d+)\s*s/i)?.[1]) || 30;
+  await sleep((seconds + 1) * 1000, signal);
+  return send();
+}
+
 // С ключом отвечает OpenRouter. Без ключа или при сбое отвечает Pollinations: он работает без настройки.
 async function request(messages, stream, signal) {
   const { aiKey } = await getSettings();
@@ -82,9 +100,9 @@ async function request(messages, stream, signal) {
       });
       if (res?.ok) return res;
     }
-    const res = await post(KEYLESS_URL, {}, { model: KEYLESS_MODEL, messages, stream }, signal);
+    const res = await keyless(messages, stream, signal);
     if (res.ok) return res;
-    if (res.status === 429 || res.status === 403) throw new Error('AI сейчас перегружен. Подождите минуту или добавьте бесплатный ключ OpenRouter в профиле.');
+    if ([402, 403, 429].includes(res.status)) throw new Error('AI сейчас перегружен. Подождите минуту или добавьте бесплатный ключ OpenRouter в профиле.');
   } catch (err) {
     if (err.name === 'AbortError' || err.message.startsWith('AI сейчас')) throw err;
     throw new Error('Не удалось связаться с AI. Проверьте интернет.');

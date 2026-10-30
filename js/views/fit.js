@@ -1,11 +1,13 @@
 import { estimateFood, getStatus, streamChat } from '../api.js';
 import { buildContext } from '../context.js';
+import { FOODS, searchFoods } from '../foods.js';
 import { ACTIVITY, MEALS, PACES, WORKOUTS, achievements, bmi, dayTotals, targets, weekSummary, workoutKcal } from '../fitness.js';
 import {
   addDays, dateKey, getFast, getFitDay, getFitDays, getFitGoal, getHabits, getPlans, parseKey, saveFast, saveFitGoal, saveHabits, savePlans, uid, updateFitDay,
 } from '../state.js';
 import { bar, chips, confirmSheet, field, formatDate, go, h, icon, openSheet, pickPhoto, renderMarkdown, rerender, ring, segmented, toast } from '../ui.js';
 
+const POPULAR = ['Овсянка на воде', 'Яйцо варёное', 'Куриная грудка', 'Гречка варёная', 'Творог 5%', 'Банан', 'Кофе чёрный', 'Салат овощной'];
 const ui = { tab: 'today' };
 const generation = { kind: null, text: '', el: null, abort: null };
 const num = (v) => {
@@ -67,7 +69,11 @@ function addFood(recent) {
     const protein = numInput('', 'Б');
     const fat = numInput('', 'Ж');
     const carbs = numInput('', 'У');
-    const fill = (f) => { name.value = f.name; kcal.value = f.kcal; protein.value = f.protein || ''; fat.value = f.fat || ''; carbs.value = f.carbs || ''; };
+    const fill = (f) => { name.value = f.portion ? `${f.name}, ${f.portion}` : f.name; kcal.value = f.kcal; protein.value = f.protein || ''; fat.value = f.fat || ''; carbs.value = f.carbs || ''; found.replaceChildren(); };
+    const found = h('div.chips');
+    name.addEventListener('input', () => {
+      found.replaceChildren(...searchFoods(name.value).slice(0, 12).map((f) => h('button.chip', { type: 'button', onclick: () => fill(f) }, `${f.name}, ${f.kcal} ккал`)));
+    });
     const aiBtn = h('button.btn.ghost', { type: 'button' }, icon('spark', 18), 'Посчитать');
     const photoBtn = h('button.btn.ghost', { type: 'button' }, icon('camera', 18), 'По фото');
     const runAi = async (payload) => {
@@ -103,10 +109,11 @@ function addFood(recent) {
       },
     },
     chips(MEALS, draft.meal, (v) => { draft.meal = v || draft.meal; }),
-    field('Что съели', name),
+    field('Что съели', name, 'Начните писать: гречка, яйцо, кофе. Подсказки появятся сами.'),
+    found,
     h('div.row-actions', aiBtn, photoBtn),
     h('div.quad', field('Ккал', kcal), field('Белки', protein), field('Жиры', fat), field('Углеводы', carbs)),
-    recent.length > 0 && field('Недавнее', h('div.chips', recent.map((f) => h('button.chip', { type: 'button', onclick: () => fill(f) }, f.name)))),
+    field('Часто едят', h('div.chips', (recent.length ? recent : POPULAR.map((n) => FOODS.find((f) => f.name === n))).map((f) => h('button.chip', { type: 'button', onclick: () => fill(f) }, f.name)))),
     h('button.btn.wide', { type: 'submit' }, 'Добавить')));
   });
 }
